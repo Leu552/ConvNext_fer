@@ -11,7 +11,7 @@ from my_dataset import MyDataSet
 from model import convnext_tiny as create_model
 from utils import read_split_data, create_lr_scheduler, get_params_groups, train_one_epoch, evaluate
 from dataset import get_dataloaders
-from utils_c import random_seed
+from utils_c import random_seed, save_checkpoint
 
 def main(args):
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
@@ -23,7 +23,11 @@ def main(args):
     tb_writer = SummaryWriter()
     random_seed(0)
     # train_images_path, train_images_label, val_images_path, val_images_label = read_split_data(args.data_path)
-
+    
+    checkpoint_path = 'check_dirs'
+    if os.path.exists(checkpoint_path) is False:
+        os.makedirs(checkpoint_path)
+    
     img_size = 224
     data_transform = {
         "train": transforms.Compose([transforms.RandomResizedCrop(img_size),
@@ -116,10 +120,17 @@ def main(args):
         tb_writer.add_scalar(tags[2], val_loss, epoch)
         tb_writer.add_scalar(tags[3], val_acc, epoch)
         tb_writer.add_scalar(tags[4], optimizer.param_groups[0]["lr"], epoch)
-
-        if best_acc < val_acc:
+        
+        is_best = val_acc > best_acc
+        if is_best:
             torch.save(model.state_dict(), "./weights/best_model.pth")
             best_acc = val_acc
+        save_checkpoint({
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'opt_state_dict': optimizer.state_dict(),
+            'best_acc': best_acc,
+        }, epoch, is_best, save_path=checkpoint_path, save_freq=args.save_freq)
 
 
 if __name__ == '__main__':
@@ -130,6 +141,8 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--lr', type=float, default=5e-4)
     parser.add_argument('--wd', type=float, default=5e-2)
+
+    parser.add_argument('--save_freq', default=10, type=int)
 
     # 数据集所在根目录
     # http://download.tensorflow.org/example_images/flower_photos.tgz
