@@ -17,16 +17,27 @@ def main(args):
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     print(f"using {device} device.")
 
-    if os.path.exists("./weights") is False:
-        os.makedirs("./weights")
+    args_path = str('CovnNext') + '_epoch' + str(args.epochs) + '_bs' + str(args.batch_size) + '_lr' + str(
+        args.lr) + '_wd' + str(args.wd) + '_' + str(args.name)
+
+    checkpoint_path = os.path.join(
+        args.results, args.name, args_path, 'checkpoints')
+    if not os.path.exists(checkpoint_path):
+        os.makedirs(checkpoint_path)
+    weight_path = os.path.join(
+        args.results, args.name, args_path, 'weights')
+    if not os.path.exists(weight_path):
+        os.makedirs(weight_path)
+    # if os.path.exists("./weights") is False:
+    #     os.makedirs("./weights")
 
     tb_writer = SummaryWriter()
     random_seed(0)
     # train_images_path, train_images_label, val_images_path, val_images_label = read_split_data(args.data_path)
     
-    checkpoint_path = 'check_dirs'
-    if os.path.exists(checkpoint_path) is False:
-        os.makedirs(checkpoint_path)
+    # checkpoint_path = 'check_dirs'
+    # if os.path.exists(checkpoint_path) is False:
+    #     os.makedirs(checkpoint_path)
     
     img_size = 224
     data_transform = {
@@ -96,7 +107,7 @@ def main(args):
     pg = get_params_groups(model, weight_decay=args.wd)
     optimizer = optim.AdamW(pg, lr=args.lr, weight_decay=args.wd)
     lr_scheduler = create_lr_scheduler(optimizer, len(train_loader), args.epochs,
-                                       warmup=True, warmup_epochs=1)
+                                       warmup=True, warmup_epochs=3)
 
     best_acc = 0.
     for epoch in range(args.epochs):
@@ -123,7 +134,7 @@ def main(args):
         
         is_best = val_acc > best_acc
         if is_best:
-            torch.save(model.state_dict(), "./weights/best_model.pth")
+            torch.save(model.state_dict(), weight_path + "/best_model.pth")
             best_acc = val_acc
         save_checkpoint({
             'epoch': epoch,
@@ -137,12 +148,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--num_classes', type=int, default=7)
-    parser.add_argument('--epochs', type=int, default=10)
-    parser.add_argument('--batch-size', type=int, default=64)
+    parser.add_argument('--epochs', type=int, default=300)
+    parser.add_argument('--batch-size', type=int, default=128)
     parser.add_argument('--lr', type=float, default=5e-4)
     parser.add_argument('--wd', type=float, default=5e-2)
 
     parser.add_argument('--save_freq', default=10, type=int)
+    parser.add_argument('--name', default='official', type=str)
+    parser.add_argument('--results', default='./results', type=str)
 
     # 数据集所在根目录
     # http://download.tensorflow.org/example_images/flower_photos.tgz
